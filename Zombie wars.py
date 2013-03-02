@@ -1,6 +1,6 @@
 # Programmer: Zackery C. Mason-Blaug
 # Date: 2/17/2013
-# Title: Tank Wars
+# Title: Zombie Wars
 
 import sys
 import pygame
@@ -16,6 +16,23 @@ class ZSprite(pygame.sprite.Sprite):
         self.dy = dy
         self.x = x
         self.y = y
+        self.rect.topleft = [ self.x, self.y ]
+
+    def update(self):
+        self.x = self.x + self.dx
+        self.y = self.y + self.dy
+        self.rect.topleft = [ self.x, self.y ]
+
+class ZPlayer(pygame.sprite.Sprite):
+    def __init__(self, filename, x, y, dx, dy):
+        pygame.sprite.Sprite.__init__(self)
+        self.image = pygame.image.load(filename).convert_alpha()
+        self.rect = self.image.get_rect()
+        self.dx = dx
+        self.dy = dy
+        self.x = x
+        self.y = y
+        self.health = 50
         self.score = 0
         self.pAmmo = 0
         self.spWep = None
@@ -26,6 +43,7 @@ class ZSprite(pygame.sprite.Sprite):
         self.y = self.y + self.dy
         self.rect.topleft = [ self.x, self.y ]
 
+        
 class ZZombies(pygame.sprite.Sprite):
     def __init__(self, filename, x, y, dx, dy, hp):
         pygame.sprite.Sprite.__init__(self)
@@ -42,6 +60,7 @@ class ZZombies(pygame.sprite.Sprite):
         self.x += self.dx
         self.y += self.dy
         self.rect.topleft = [ self.x, self.y ]
+
     
 class Gun(pygame.sprite.Sprite):
     def __init__(self, filename, x, y, ammo, gun):
@@ -109,6 +128,12 @@ def drawText1(text, font, surface,x, y):
     textrect = textobj.get_rect()
     textrect.topleft = (x, y)
     surface.blit(textobj, textrect)
+
+def playSound(soundfile):
+    sound = pygame.mixer.Sound(soundfile)
+
+
+    
     
 pygame.display.set_caption('Tank Buster')
 
@@ -119,27 +144,29 @@ fpsClock = pygame.time.Clock()
 pygame.init()
 screen = pygame.display.set_mode([1040, 640])
 
-pygame.mixer.pre_init(44100, -16, 2, 2048) # setup mixer to avoid sound lag
-pygame.init()
+pygame.mixer.pre_init(44100, -16, 2, 2048) # setup mixer to avoid lag
 
+#Create groups
 missiles = pygame.sprite.Group()
 missiles2 = pygame.sprite.Group()
 strMissiles = pygame.sprite.Group()
 blocks = pygame.sprite.Group()
 baddies = pygame.sprite.Group()
+bosses = pygame.sprite.Group()
+bShots = pygame.sprite.Group()
 
+#Powerups data
 powerUps = pygame.sprite.Group()
 powerTime = 0
 powers = 0
 
+#Weapons data
 weapons = pygame.sprite.Group()
 WTime = 0
 
-
-tank = ZSprite('RamboZombKiller.png', 500, 500, 0, 0)
-tankHealth = 50
-soldier = ZSprite('soldier.png', 400, 500, 0 ,0)
-soldierHealth = 50
+#Create Players
+tank = ZPlayer('RamboZombKiller.png', 500, 500, 0, 0)
+soldier = ZPlayer('soldier.png', 400, 500, 0 ,0)
 
 blocks.add(ZSprite('sandbag.png', 300, 200, 0, 0))
 blocks.add(ZSprite('sandbag.png', 800, 200, 0, 0))
@@ -159,11 +186,13 @@ GChoice = 0
 ZMode = 1
 ZTime = 0
 DTime = 0
+BTime = 0
 ZScore = 0
 Difficulty = 100
 DD = 60
 difficultyTime = 0
 lvl = 0
+create = 1
 
 
 while True:
@@ -173,13 +202,13 @@ while True:
     screen.blit(soldier.image, soldier.rect)
     death = None
     death2 = None
-    TH = tankHealth
-    BTH = soldierHealth
+    TH = tank.health
+    BTH = soldier.health
 
-    if soldierHealth <= 0:
+    if soldier.health <= 0:
         BTH = 'Dead'
         
-    if tankHealth <= 0:
+    if tank.health <= 0:
         TH = "Dead"
 
     if tank.y >= 620:
@@ -214,6 +243,10 @@ while True:
             zombi.dx *= -1
         if zombi.x <= 0:
             zombi.dx *= -1
+        if zombi.hp <= 0:
+            baddies.remove(zombi)
+            zombi.kill()
+            
 
     for demon in baddies:
         screen.blit(demon.image, demon.rect)
@@ -222,6 +255,25 @@ while True:
             baddies.remove(demon)
             demon.kill()
             ZScore += 1
+        if demon.hp <= 0:
+            baddies.remove(demon)
+            demon.kill()
+
+    for Boss in bosses:
+        screen.blit(Boss.image, Boss.rect)
+        Boss.update()
+        if Boss.y >= 0:
+            Boss.dy = 0
+        if pygame.time.get_ticks() - BTime > 100:
+            fireBall = bShots.add(ZSprite('napalm.png', Boss.x, Boss.y, random.randint(-7, 7), random.randint(5, 10)))
+            BTime = pygame.time.get_ticks()
+        if Boss.hp <= 0:
+            bosses.remove(Boss)
+            Boss.kill()
+
+    for fireBall in bShots:
+        fireBall.update()
+        screen.blit(fireBall.image, fireBall.rect)
 
     for shotgun in weapons:
         shotgun.update()
@@ -319,13 +371,12 @@ while True:
                 if tank.spWep == 'Flamer':
                     if tank.pAmmo > 0:
                         firing4 = 1
-                        
 
             elif event.key == K_RETURN:
-                tankHealth = 50
-                soldierHealth = 50
+                tank.health = 50
+                soldier.health = 50
                 tank.x, tank.y = 500, 500
-                soldier.x, soldier.y = 200, 200
+                soldier.x, soldier.y = 200, 500
                 Difficulty = 100
                 ZMode = 1
                 tank.score = 0
@@ -334,6 +385,8 @@ while True:
                 tank.pAmmo = 0
                 soldier.pAmmo = 0
                 lvl = 1
+                tank.spWep = None
+                soldier.spWep = None
                 for zombi in baddies:
                     baddies.remove(zombi)
                     zombi.kill()
@@ -346,16 +399,19 @@ while True:
                 Difficulty = 25
 
             elif event.key == K_7:
-                tankHealth = 50
-                soldierHealth = 50
-                tank.pAmmo = 300
-                soldier.pAmmo = 300
+                tank.health = 50
+                soldier.health = 50
+                tank.pAmmo = 1000
+                soldier.pAmmo = 1000
                 tank.spWep = 'Flamer'
                 soldier.spWep = 'Flamer'
 
             elif event.key == K_6:
-                tankHealth = 50
-                soldierHealth = 50
+                tank.health = 50
+                soldier.health = 50
+
+            elif event.key == K_4:
+                lvl = 10
 
         elif event.type == KEYUP:
             if event.key == K_w:
@@ -406,6 +462,8 @@ while True:
     collision4 = pygame.sprite.spritecollide(soldier, weapons, True)
     pygame.sprite.groupcollide(blocks ,missiles, False, True)
     pygame.sprite.groupcollide(blocks ,missiles2, False, True)
+    b_collide = pygame.sprite.groupcollide(missiles, bosses, True, False)
+    B_collide = pygame.sprite.groupcollide(missiles2, bosses, True, False)
 
 
     drawText('Left Player: %s Kills: %s Ammo: %s' % (TH, tank.score, tank.pAmmo), font, screen,10,0)
@@ -414,31 +472,39 @@ while True:
     drawText1('Level: %s' % (lvl), font, screen, 900, 600)
     
     if len(collision5) >= 1:
-        tankHealth += 5
+        tank.health += 5
         powers -= 1
         collision5 = 0
 
     if len(collision6) >= 1:
-        soldierHealth += 5
+        soldier.health += 5
         powers -= 1
         collision6 = 0
 
     if len(collision3) >= 1:
-        tank.pAmmo += shotgun.ammo
-        tank.spWep = shotgun.gun
+        if tank.spWep != collision3[0].gun:
+            tank.pAmmo = 0
+        tank.pAmmo += collision3[0].ammo
+        tank.spWep = collision3[0].gun
+        weapons.remove(collision3[0])
+        print(tank.spWep)
         collision3 = 0
 
     if len(collision4) >= 1:
-        soldier.pAmmo += shotgun.ammo
-        soldier.spWep = shotgun.gun
+        if soldier.spWep != collision4[0].gun:
+            soldier.pAmmo = 0
+        soldier.pAmmo += collision4[0].ammo
+        soldier.spWep = collision4[0].gun
+        weapons.remove(collision4[0])
+        print(soldier.spWep)
         collision4 = 0
 
     if len(collision) >= 1:
-        soldierHealth -= 1
+        soldier.health -= 1
         collision = 0
 
     if len(collision0) >= 1:
-        tankHealth -= 1
+        tank.health -= 1
         collsion0 = 0
 
     if len(collision1) >= 1:
@@ -451,16 +517,24 @@ while True:
         soldier.score += 1
         #print(soldier.score)
 
+    if len(b_collide) >= 1:
+        b_collide = 0
+        Boss.hp -= 1
+
+    if len(B_collide) >= 1:
+        B_collide = 0
+        Boss.hp -= 1
+
     if tank.pAmmo == 0:
         tank.spWep = None
 
     if soldier.pAmmo == 0:
         soldier.spWep = None
         
-    if tankHealth <= 0 and death is None:
+    if tank.health <= 0 and death is None:
         death = ZSurface('fire.png', tank.x, tank.y, 0,0)
         tank.x , tank.y = -700, -700
-        if soldierHealth <= 0:
+        if soldier.health <= 0:
             if ZMode == 1:
                 ZMode = 0
                 print("Tank got " + str(tank.score) + " kills. " + str(ZScore) + " Zombies escaped, Your kill percentage is: " + str(int(tank.score/(tank.score + ZScore) * 100 )))
@@ -471,10 +545,10 @@ while True:
     if death != None:
         screen.blit(death.image, death.rect)
         
-    if soldierHealth <= 0.0 and death2 is None:
+    if soldier.health <= 0.0 and death2 is None:
         death2 = ZSurface('fire.png', soldier.x, soldier.y, 0,0)
         soldier.x, soldier.y = -700, -700
-        if tankHealth <= 0:
+        if tank.health <= 0:
             if ZMode == 1:
                 ZMode = 0
                 print("Tank got " + str(tank.score) + " kills. " + str(ZScore) + " Zombies escaped, Your kill percentage is: " + str(int(tank.score + 1/(tank.score + ZScore) * 100 )))
@@ -521,7 +595,7 @@ while True:
         print(Difficulty)
         
 
-    if pygame.time.get_ticks() - powerTime > 20000:
+    if pygame.time.get_ticks() - powerTime > 10000:
         if powers == 0:
             powers += 1
             powerUps.add(ZSprite('health.png', random.randint(100,1000), random.randint(0,600), 0,0))
@@ -543,9 +617,18 @@ while True:
                 
                 if pygame.time.get_ticks() - DTime > DD:
                     DTime = pygame.time.get_ticks()
-                    demon = baddies.add(ZZombies('Demon.png', random.randint(1,1000), 0, 0, random.randint(3,9), 3))
+                    demon = baddies.add(ZZombies('Demon.png', random.randint(1,1000), 0, 0, random.randint(3,9), 2))
         ZTime = pygame.time.get_ticks()
-            
+
+    if lvl >= 10:
+        ZMode = 2
+
+    if ZMode == 2:
+        if create == 1:
+            Boss = bosses.add(ZZombies('BossDemon.png', 500, -100, 0, 3, 1000))
+            create -= 1
+        
+
         
     pygame.display.update()
     fpsClock.tick(FPS)

@@ -5,10 +5,11 @@
 import sys
 import pygame
 import random
+import math
 from pygame.locals import *
 
 class ZSprite(pygame.sprite.Sprite):
-    def __init__(self, filename, x, y, dx, dy):
+    def __init__(self, filename, x, y, dx, dy, angle):
         pygame.sprite.Sprite.__init__(self)
         self.image = pygame.image.load(filename).convert_alpha()
         self.image0 = pygame.image.load(filename).convert_alpha()
@@ -17,53 +18,17 @@ class ZSprite(pygame.sprite.Sprite):
         self.dy = dy
         self.x = x
         self.y = y
-        self.angle = 0
+        self.rotation = 0
+        self.angle = angle
         self.rect.topleft = [ self.x, self.y ]
 
     def update(self):
         self.x = self.x + self.dx
         self.y = self.y + self.dy
         self.rect.topleft = [ self.x, self.y ]
+        self.angle += self.rotation
         self.image = pygame.transform.rotate(self.image0, self.angle)
 
-class ZTank(pygame.sprite.Sprite):
-    tankTurnSpeed = 8
-    maxRotate = 360
-    tankRotateLeft = False
-    tankRotateRight = False
-    def __init__(self, filename, x, y, dx, dy, angle=0):
-        pygame.sprite.Sprite.__init__(self)
-        image = pygame.image.load(filename).convert_alpha()
-        self.tankAngle = angle
-        self.x = x
-        self.y = y
-        self.dx = dx
-        self.dy = dy
-        self.image0 = image.convert_alpha()
-        self.image = image.convert_alpha()
-        self.rect = self.image0.get_rect()
-        self.tankturndirection = 0
-        self.tankTurnSpeed = ZTank.tankTurnSpeed
-
-    def update(self):
-        self.x += self.dx
-        self.y += self.dy
-        self.rect.topleft = [ self.x, self.y ]
-
-        self.tankturndirection = 0
-        if self.tankRotateLeft == True:
-            self.tankturndirection += 1
-        if self.tankRotateRight == True:
-            self.tankturndirection -= 1
-
-        self.tankAngle += self.tankturndirection * self.tankTurnSpeed
-
-        oldcenter = self.rect.center
-        oldrect = self.image.get_rect()
-        self.image = pygame.transform.rotate(self.image0, self.tankAngle)
-        self.rect = self.image.get_rect()
-        self.rect.center = oldcenter
-        
 
 class ZPower(pygame.sprite.Sprite):
     def __init__(self, filename, x, y, power):
@@ -158,15 +123,15 @@ powerUps = pygame.sprite.Group()
 powerTime = 0
 powers = 0
 
-tank = ZSprite('tank.png', 500, 500, 0, 0)
+tank = ZSprite('tank.png', 500, 500, 0, 0, 0)
 tankHealth = 50
 tankMines = 4
-badTank = ZSprite('tank2.png', 100, 100, 0 ,0)
+badTank = ZSprite('tank2.png', 100, 100, 0 ,0, 0)
 badTankHealth = 50
 badTankMines = 4
 
-blocks.add(ZSprite('sandbag.png', 300, 400, 0, 0))
-blocks.add(ZSprite('sandbag.png', 800, 200, 0, 0))
+blocks.add(ZSprite('sandbag.png', 300, 400, 0, 0, 0))
+blocks.add(ZSprite('sandbag.png', 800, 200, 0, 0, 0))
 
 font = pygame.font.SysFont(None, 48)
 
@@ -268,12 +233,11 @@ while True:
             elif event.key == K_s:
                 tank.dy = 10
 
-            elif event.key == K_e:
-                #tank.angle += 10
-                turn = True
-                
             elif event.key == K_q:
-                tank.angle -= 10
+                tank.rotation = 10
+                
+            elif event.key == K_e:
+                tank.rotation = -10
 
             elif event.key == K_d:
                 tank.dx = 10
@@ -294,33 +258,37 @@ while True:
                 badTank.dx = -10
 
             elif event.key == K_n:
-                missiles.add(ZSprite('tmissile.png', tank.x + 14, tank.y, 0 ,-20))
+                s = 10
+                theta = math.radians(tank.angle)
+                dx = - s * math.sin(theta)
+                dy = - s * math.cos(theta)
+                missiles.add(ZSprite('tmissile.png', tank.x + 14, tank.y + 28 , dx, dy, tank.angle))
 
             elif event.key == K_y:
-                strMissiles.add(ZSprite('tmissile.png', tank.x + 14, tank.y, 0 ,-5))
+                strMissiles.add(ZSprite('tmissile.png', tank.x + 14, tank.y, 0 ,-5, 0))
 
             elif event.key == K_m:
                 firing2 = 1
 
             elif event.key == K_b:
                 if tankMines > 0:
-                    mines.add(ZSprite('landmine.png', tank.x, tank.y, 0 ,0))
+                    mines.add(ZSprite('landmine.png', tank.x, tank.y, 0 ,0, 0))
                     tankMines -= 1
                 else:
                     continue
                 
             elif event.key == K_KP2:
-                badMissiles.add(ZSprite('tmissile2.png', badTank.x + 14, badTank.y + 50, 0 ,20))
+                badMissiles.add(ZSprite('tmissile2.png', badTank.x + 14, badTank.y + 50, 0 ,20, 0))
 
             elif event.key == K_KP7:
-                strMissiles2.add(ZSprite('tmissile2.png', badTank.x + 14, badTank.y + 50, 0 ,5))
+                strMissiles2.add(ZSprite('tmissile2.png', badTank.x + 14, badTank.y + 50, 0 ,5, 0))
 
             elif event.key == K_KP3:
                 firing = 1
 
             elif event.key == K_KP1:
                 if badTankMines > 0:
-                    mines1.add(ZSprite('landmine.png', badTank.x, badTank.y, 0, 0))
+                    mines1.add(ZSprite('landmine.png', badTank.x, badTank.y, 0, 0,0))
                     badTankMines -= 1
                 else:
                     continue
@@ -340,7 +308,7 @@ while True:
                     mine.kill()
 
             elif event.key == K_u:
-                missiles.add(ZSprite('tmissile.png', tank.x + 14, tank.y, 0 ,-20))
+                missiles.add(ZSprite('tmissile.png', tank.x + 14, tank.y, 0 ,-20,0))
                 lockOn(tank, badTank, missiles)
 
             elif event.key == K_i:
@@ -360,6 +328,12 @@ while True:
             elif event.key == K_d:
                 tank.dx = 0
 
+            elif event.key == K_e:
+                tank.rotation = 0
+
+            elif event.key == K_q:
+                tank.rotation = 0
+
             elif event.key == K_UP:
                 badTank.dy = 0
 
@@ -377,9 +351,6 @@ while True:
 
             elif event.key == K_m:
                 firing2 = 0
-
-    if turn == True:
-        tank.angle += 10
 
 
     collision = pygame.sprite.spritecollide(tank, badMissiles, True)
@@ -471,18 +442,18 @@ while True:
 
     if firing == 1:
         if pygame.time.get_ticks() - fireTime > 35:
-            badMissiles2.add(ZSprite('bullet2.png', badTank.x + 6, badTank.y + 50, 0 ,20))
+            badMissiles2.add(ZSprite('bullet2.png', badTank.x + 6, badTank.y + 50, 0 ,20, 0))
             fireTime = pygame.time.get_ticks()
 
     if firing2 == 1:
         if pygame.time.get_ticks() - fireTime2 > 35:
-            missiles2.add(ZSprite('bullet.png', tank.x + 6, tank.y, 0 ,-20))
+            missiles2.add(ZSprite('bullet.png', tank.x + 6, tank.y, 0 ,-20, 0))
             fireTime2 = pygame.time.get_ticks()
 
     if pygame.time.get_ticks() - powerTime > 20000:
         if powers == 0:
             powers += 1
-            powerUps.add(ZSprite('health.png', random.randint(100,1000), random.randint(0,600), 0,0))
+            powerUps.add(ZSprite('health.png', random.randint(100,1000), random.randint(0,600), 0,0,0))
         powerTime = pygame.time.get_ticks()
         
         
